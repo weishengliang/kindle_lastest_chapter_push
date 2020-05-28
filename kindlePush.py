@@ -20,7 +20,7 @@ def main():
     global smtpserver   # smtp服务地址
     global serverport   # smtp端口
     global password     # 发送方邮箱密码
-    global istls        # smtp加密方式
+    global encryption   # smtp加密方式 0:明文 1:tls 2:ssl
     configfile = Path("config/config.cfg")
     if configfile.exists():
         config = ConfigObj("config/config.cfg", encoding="utf-8")
@@ -35,22 +35,26 @@ def main():
         serverport = config["mail"]["serverport"]
         # 邮箱密码 这个密码是发送邮件那个邮箱的密码
         password = config["mail"]["password"]
-        istls = config["mail"]["istls"]
+        encryption = config["mail"]["encryption"]
         if bookNames != '':
             if kindlemail != '':
                 if sendmail != '':
                     if smtpserver != '':
                         if serverport != '':
                             if password != '':
-                                catchnovel()
-                                return
+                                if encryption != '':
+                                    catchnovel()
+                                    return
         print("配置有误,程序将在3秒后重新进入配置")
         time.sleep(3)
         setconfig()
     else:
-        print("本软件不会上传用户个人信息(邮箱,密码之类的)请您放心使用")
-        print("如有疑问,您可以github获取源码,或通过邮箱联系到我")
-        print("git:https://")
+        print("---------------------本软件不会上传用户个人信息(邮箱,密码之类的)请您放心使用---------------")
+        print("------------------------如有疑问,您可以github获取源码,或通过邮箱联系到我------------------")
+        print("-------------git:https://github.com/weishengliang/kindle_lastest_chapter_push--------")
+        print("--------------------------------mail:cnweisl@163.com---------------------------------")
+        print("-------------------------------输入回车继续使用,退出请右上角----------------------------")
+        input()
         setconfig()
 
 # 爬取解析数据
@@ -70,14 +74,16 @@ def catchnovel():
                 response.encoding = "utf-8"
                 # 解析获得的html文本
                 soup = BeautifulSoup(response.text, 'lxml')
-                # 获取最新章节的a标签
+                # 获取小说名a标签
                 bookinfo = soup.find('a', class_="novelname")
                 bookinfourl = bookinfo['href']
+                # 获取小说详情页
                 bookinfores = requests.get(website[0]+bookinfourl, headers=headers)
                 time.sleep(1)
                 if bookinfores.status_code == 200:
                     bookinfores.encoding = "utf-8"
                     bookinfosoup = BeautifulSoup(bookinfores.text, "lxml")
+                    # 解析出最新章节的标签
                     ul = bookinfosoup.find(class_="novelinfo-l").find("ul")
                     last = ul.find_all("li")[5].find("a")
                     # 获取最新章节的名称 用来判断该章节是否获取过 同时用作文件名
@@ -91,7 +97,8 @@ def catchnovel():
                         log(bookName+"暂无更新")
                         continue
                     log("发现最新章节:"+newChapterName)
-                    Path(bookName).mkdir()
+                    if not Path(bookName).exists():
+                        Path(bookName).mkdir()
                     # 未获取过 则开始获取最新章节html文本
                     lastResponse = requests.get(website[0]+newChapterUrl, headers=headers)
                     time.sleep(1)
@@ -100,6 +107,8 @@ def catchnovel():
                     lastSoup = BeautifulSoup(lastResponse.text, "lxml")
                     # 获取内容
                     lastcontent = lastSoup.find(class_="content")
+                    if lastcontent.length < 1000:
+                        continue
                     # 写入文件
                     file = open(bookName+"/"+newChapterName + ".txt", mode="w+", encoding="utf-8")
                     # print(lastcontent.get_text())
@@ -120,14 +129,15 @@ def log(str):
 # 发送邮件
 def sendMail(bookName, newChapterName):
 
-    # 设置发送的内容
+    # 设置发送的内容 MIMEMultipart 几乎可以发送所有的附件类型
     message = MIMEMultipart()
     # 转化为邮件文本
-
-    content = MIMEText(open(bookName+"/"+newChapterName + ".txt", "rb").read(), 'base64', 'utf-8')
+    file = open(bookName+"/"+newChapterName + ".txt", "rb")
+    content = MIMEText(file.read(), 'base64', 'utf-8')
 
     content["content_Type"] = 'application/octet-stream'
     content.add_header("Content-Disposition", "attachment", fileName=("utf-8", "", newChapterName+".txt"))
+    file.close()
 
     message.attach(content)
     # 主题
@@ -136,11 +146,14 @@ def sendMail(bookName, newChapterName):
     message["From"] = sendmail
 
     # 创建SMTP 服务器 连接
-    mailServer = smtplib.SMTP(smtpserver, serverport)
+    if encryption == '2':
+        mailServer = smtplib.SMTP_SSL(smtpserver, serverport)   # ssl加密方式
+    else:
+        mailServer = smtplib.SMTP(smtpserver, serverport)       # smtp普通连接
+        if encryption == '1':                                   # tls加密
+            mailServer.ehlo()
+            mailServer.starttls()                               # 添加tls加密
 
-    if istls == '1':
-        mailServer.ehlo()
-        mailServer.starttls()
     # 登陆邮箱
     mailServer.login(sendmail, password)
     # 发送邮件
@@ -168,8 +181,8 @@ def setconfig():
     print("请输入发送邮箱密码(将会明文保存在根目录下config/config.cfg中):")
     password = input()
 
-    print("请选择该smtp服务是否tls加密(1：是 2：否):")
-    istl = input()
+    print("请选择该smtp服务是否tls加密(:0：无加密明文 1：tls加密 2：ssl加密):")
+    encryption = input()
 
     books = []
     while 1:
@@ -186,7 +199,7 @@ def setconfig():
         "smtpserver": smtpserver,
         'serverport': serverport,
         'password': password,
-        'istls': istl
+        'encryption': encryption
     }
     config["mail"].comments = {
         "kindlemail": ["接收邮箱", ],
@@ -194,7 +207,7 @@ def setconfig():
         "smtpserver": ['smtp服务地址', ],
         'serverport': ['smtp服务端口', ],
         'password': ['发送邮箱密码', ],
-        'istls': ['邮箱是否tls加密 1:是 0:否'],
+        'encryption': ['邮箱加密方式 0:明文 1:tls 2:ssl'],
     }
     config["book"] = {
         "bookName": books
