@@ -1,13 +1,9 @@
 # -*- coding: UTF-8 -*-
 import requests
-import datetime
 import time
-import xlwt
-import pymysql
 from bs4 import BeautifulSoup
 from pathlib import Path
 import smtplib
-from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from configobj import ConfigObj
@@ -107,8 +103,9 @@ def catchnovel():
                     lastSoup = BeautifulSoup(lastResponse.text, "lxml")
                     # 获取内容
                     lastcontent = lastSoup.find(class_="content")
-                    if lastcontent.length < 1000:
-                        continue
+                    # 如果正文字数小于1000 则跳过
+                    # if len(lastcontent.get_text()) < 1000:
+                    #     continue
                     # 写入文件
                     file = open(bookName+"/"+newChapterName + ".txt", mode="w+", encoding="utf-8")
                     # print(lastcontent.get_text())
@@ -119,7 +116,7 @@ def catchnovel():
                     sendMail(bookName, newChapterName)
             # 为避免ip被禁 等待35s再请求下一本书
             time.sleep(3)
-        print('下次搜索将在5分钟后进行，如需停止，请直接退出，否则程序将一直运行')
+        print('下次搜索将在5分钟后进行，如需持续搜索，请勿关闭此窗口')
         time.sleep(300)
 
 
