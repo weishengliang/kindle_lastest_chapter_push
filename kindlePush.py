@@ -61,61 +61,66 @@ def catchnovel():
                       '(KHTML, like Gecko) Chrome/64.0.3282.119 Safari/537.36'}
     website = ["http://www.booksky.cc", "http://www.booksky.so"]
     searchcontent = "/modules/article/search.php?searchkey="
-    while 1:
+    while True:
         for bookName in bookNames:
             targeturl = website[0] + searchcontent + bookName
-            response = requests.get(targeturl, headers=headers)
-            time.sleep(1)
-            if response.status_code == 200:
-                response.encoding = "utf-8"
-                # 解析获得的html文本
-                soup = BeautifulSoup(response.text, 'lxml')
-                # 获取小说名a标签
-                bookinfo = soup.find('a', class_="novelname")
-                bookinfourl = bookinfo['href']
-                # 获取小说详情页
-                bookinfores = requests.get(website[0]+bookinfourl, headers=headers)
-                time.sleep(1)
-                if bookinfores.status_code == 200:
-                    bookinfores.encoding = "utf-8"
-                    bookinfosoup = BeautifulSoup(bookinfores.text, "lxml")
-                    # 解析出最新章节的标签
-                    ul = bookinfosoup.find(class_="novelinfo-l").find("ul")
-                    last = ul.find_all("li")[5].find("a")
-                    # 获取最新章节的名称 用来判断该章节是否获取过 同时用作文件名
-                    newChapterName = last["title"]
-                    # 最新章节的url
-                    newChapterUrl = last["href"]
-                    # print(str(newChapterName) + ":" + str(newChapterUrl))
-                    # 检查最新章节是否已经获取过
-                    filepath = Path(bookName+"/"+newChapterName + ".txt")
-                    if filepath.exists():   # 获取过最新章节则跳过该章节的获取
-                        log(bookName+"暂无更新")
-                        continue
-                    log("发现最新章节:"+newChapterName)
-                    if not Path(bookName).exists():
-                        Path(bookName).mkdir()
-                    # 未获取过 则开始获取最新章节html文本
-                    lastResponse = requests.get(website[0]+newChapterUrl, headers=headers)
-                    time.sleep(1)
-                    lastResponse.encoding = "utf-8"
-                    # 解析
-                    lastSoup = BeautifulSoup(lastResponse.text, "lxml")
-                    # 获取内容
-                    lastcontent = lastSoup.find(class_="content")
-                    # 如果正文字数小于1000 则跳过
-                    # if len(lastcontent.get_text()) < 1000:
-                    #     continue
-                    # 写入文件
-                    file = open(bookName+"/"+newChapterName + ".txt", mode="w+", encoding="utf-8")
-                    # print(lastcontent.get_text())
-                    file.write(lastcontent.get_text())
-                    file.flush()
-                    file.close()
-                    # 调用接口发送邮件
-                    sendMail(bookName, newChapterName)
-            # 为避免ip被禁 等待35s再请求下一本书
-            time.sleep(3)
+            while True:
+                try:
+                    response = requests.get(targeturl, headers=headers, timeout=5)
+                    if response.status_code == 200:
+                        response.encoding = "utf-8"
+                        # 解析获得的html文本
+                        soup = BeautifulSoup(response.text, 'lxml')
+                        # 获取小说名a标签
+                        bookinfo = soup.find('a', class_="novelname")
+                        bookinfourl = bookinfo['href']
+                        # 获取小说详情页
+                        bookinfores = requests.get(website[0] + bookinfourl, headers=headers)
+                        time.sleep(1)
+                        if bookinfores.status_code == 200:
+                            bookinfores.encoding = "utf-8"
+                            bookinfosoup = BeautifulSoup(bookinfores.text, "lxml")
+                            # 解析出最新章节的标签
+                            ul = bookinfosoup.find(class_="novelinfo-l").find("ul")
+                            last = ul.find_all("li")[5].find("a")
+                            # 获取最新章节的名称 用来判断该章节是否获取过 同时用作文件名
+                            newChapterName = last["title"]
+                            # 最新章节的url
+                            newChapterUrl = last["href"]
+                            # print(str(newChapterName) + ":" + str(newChapterUrl))
+                            # 检查最新章节是否已经获取过
+                            filepath = Path(bookName + "/" + newChapterName + ".txt")
+                            if filepath.exists():  # 获取过最新章节则跳过该章节的获取
+                                log(bookName + "暂无更新")
+                                break
+                            log("发现最新章节:" + newChapterName)
+                            if not Path(bookName).exists():
+                                Path(bookName).mkdir()
+                            # 未获取过 则开始获取最新章节html文本
+                            lastResponse = requests.get(website[0] + newChapterUrl, headers=headers)
+                            time.sleep(1)
+                            lastResponse.encoding = "utf-8"
+                            # 解析
+                            lastSoup = BeautifulSoup(lastResponse.text, "lxml")
+                            # 获取内容
+                            lastcontent = lastSoup.find(class_="content")
+                            # 如果正文字数小于1000 则跳过
+                            # if len(lastcontent.get_text()) < 1000:
+                            #     continue
+                            # 写入文件
+                            file = open(bookName + "/" + newChapterName + ".txt", mode="w+", encoding="utf-8")
+                            # print(lastcontent.get_text())
+                            file.write(lastcontent.get_text())
+                            file.flush()
+                            file.close()
+                            # 调用接口发送邮件
+                            sendMail(bookName, newChapterName)
+                            break
+                except requests.exceptions.Timeout:
+                    print("请求超时，系统将在30秒后重试")
+                    time.sleep(30)
+            # 为避免ip被禁 等待5s再请求下一本书
+            time.sleep(5)
         print('下次搜索将在5分钟后进行，如需持续搜索，请勿关闭此窗口')
         time.sleep(300)
 
