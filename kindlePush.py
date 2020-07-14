@@ -116,7 +116,7 @@ def catchnovel():
                             # 调用接口发送邮件
                             sendMail(bookName, newChapterName)
                             break
-                except requests.exceptions.Timeout:
+                except:
                     print("请求超时，系统将在30秒后重试")
                     time.sleep(30)
             # 为避免ip被禁 等待5s再请求下一本书
