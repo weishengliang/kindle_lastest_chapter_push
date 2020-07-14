@@ -105,8 +105,9 @@ def catchnovel():
                             # 获取内容
                             lastcontent = lastSoup.find(class_="content")
                             # 如果正文字数小于1000 则跳过
-                            # if len(lastcontent.get_text()) < 1000:
-                            #     continue
+                            if len(lastcontent.get_text()) < 1000:
+                                log(newChapterName+" 内容不完整,跳过")
+                                break
                             # 写入文件
                             file = open(bookName + "/" + newChapterName + ".txt", mode="w+", encoding="utf-8")
                             # print(lastcontent.get_text())
@@ -126,7 +127,7 @@ def catchnovel():
 
 
 def log(str):
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + str)
+    print(time.strftime("%Y-%m-%d %H:%M:%S ", time.localtime()) + str)
 
 # 发送邮件
 def sendMail(bookName, newChapterName):
